@@ -9,14 +9,14 @@ or general usability.
 
 ## Targets
 
-- [] Implement the lexer
-- [] Implement simulation
-- [] Implement actual compilation
-  - [] MacOS
-  - [] Linux
-  - [] (Possibly, Windows)
-- [] Implement most operations in Porth
-- [] Introduce a similar [testing system](https://gitlab.com/tsoding/porth#testing)
+- [ ] Implement the lexer
+- [ ] Implement simulation
+- [ ] Implement actual compilation
+  - [ ] MacOS
+  - [ ] Linux
+  - [ ] (Possibly, Windows)
+- [ ] Implement most operations in Porth
+- [ ] Introduce a similar [testing system](https://gitlab.com/tsoding/porth#testing)
 
 ## Acknowledgement
 
