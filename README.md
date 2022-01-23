@@ -1,9 +1,22 @@
-# PORRS
+# Porrs
 
-It is [Porth](https://gitlab.com/tsoding/porth), but re-implemented in [Rust]([https://rust-](https://www.rust-lang.org)).
+It is [Porth](https://gitlab.com/tsoding/porth), but re-implemented in [Rust](https://www.rust-lang.org).
 
-With no experience in language / compiler development, this is only a hobby project
-and learning experience. Do not expect anything great out of this.
+With no experience in language / compiler development, this is only a hobby project.
+The aim of this project is to simply use it as a learning experience. Do not expect
+anything great out of this, unlike other Rust projects that aims for speed, safety,
+or general usability.
+
+## Targets
+
+[] Implement the lexer
+[] Implement simulation
+[] Implement actual compilation
+    [] MacOS
+    [] Linux
+    [] (Possibly, Windows)
+[] Implement most operations in Porth
+[] Introduce a similar [testing system](https://gitlab.com/tsoding/porth#testing)
 
 ## Acknowledgement
 
