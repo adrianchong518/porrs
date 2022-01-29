@@ -4,4 +4,4 @@ mod program;
 mod simulate;
 
 pub use program::Program;
-pub use simulate::simulate_program;
+pub use simulate::Simulation;

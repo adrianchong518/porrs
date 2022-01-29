@@ -27,10 +27,10 @@ pub(crate) struct Lexer {
 impl Lexer {
     pub(crate) fn from_path(path: &Path) -> Self {
         let file_reader = BufReader::new(File::open(path).unwrap_or_else(|err| {
-            log::error!("Unable to read provided file: {:?} ({})", path, err);
+            log::error!("Unable to read provided file: {} ({})", path.display(), err);
             exit(1);
         }));
-        log::debug!("Opened file: {:?}", path);
+        log::debug!("Opened file: {}", path.display());
 
         Lexer {
             file_reader,

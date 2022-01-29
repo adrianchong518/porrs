@@ -8,10 +8,12 @@ pub(crate) enum OpType {
     Intrinsic(IntrinsicType),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum IntrinsicType {
     Plus,
+    Subtract,
     Multiply,
+    DivMod,
     Print,
 }
 
@@ -19,7 +21,9 @@ impl IntrinsicType {
     fn from_word(word: &str) -> Option<Self> {
         match word {
             "+" => Some(Self::Plus),
+            "-" => Some(Self::Subtract),
             "*" => Some(Self::Multiply),
+            "divmod" => Some(Self::DivMod),
             "print" => Some(Self::Print),
             _ => None,
         }

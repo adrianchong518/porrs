@@ -40,12 +40,12 @@ fn main() {
     init_logger();
 
     let config = Config::parse();
-    log::debug!("CLI Config: {:?}", config);
+    log::debug!("CLI Config: {:#?}", config);
 
     let program = porrs::Program::from_path(&config.source_file);
 
     match config.execution_mode {
-        ExecutionMode::Simulate => porrs::simulate_program(program),
+        ExecutionMode::Simulate => porrs::Simulation::new(program).simulate(),
         ExecutionMode::NativeCompile => unimplemented!("File compilation is not yet implemented"),
     }
 }
