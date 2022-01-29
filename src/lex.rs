@@ -1,21 +1,21 @@
-use std::io::BufReader;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::exit;
-use std::{fs::File, io::BufRead};
 
 use crate::program::{FileLocation, FilePosition};
 
 #[derive(Debug)]
-enum TokenType {
+pub(crate) enum TokenType {
     Word,
     Int(u64),
 }
 
 #[derive(Debug)]
 pub(crate) struct Token {
-    typ: TokenType,
-    text: String,
-    loc: FileLocation,
+    pub(crate) typ: TokenType,
+    pub(crate) text: String,
+    pub(crate) loc: FileLocation,
 }
 
 pub(crate) struct Lexer {
@@ -40,7 +40,7 @@ impl Lexer {
     }
 
     pub(crate) fn next_token(&mut self) -> Option<Token> {
-        if self.lexing_line.is_empty() {
+        while self.lexing_line.is_empty() {
             match self.file_reader.read_line(&mut self.lexing_line) {
                 Ok(0) => return None,
                 Ok(bytes) => {
@@ -52,29 +52,41 @@ impl Lexer {
                         None => self.current_location.pos = Some(FilePosition { line: 1, col: 1 }),
                     }
 
+                    let trimmed = self.lexing_line.trim();
+
                     log::trace!(
-                        "Read {} bytes from {}: \"{}\"",
+                        "Read {} bytes from {}: \"{}\" (trimmed: \"{}\")",
                         bytes,
                         self.current_location,
                         self.lexing_line,
+                        trimmed
                     );
+
+                    self.lexing_line = trimmed.to_owned();
                 }
-                Err(_) => todo!(),
+                Err(_) => {
+                    log::error!(
+                        "Failed to read the contents of file: {}",
+                        self.current_location.path.display()
+                    );
+                    exit(1);
+                }
             }
         }
 
         let loc = self.current_location.clone();
+        let initial_len = self.lexing_line.len();
 
         let token_end = self
             .lexing_line
             .find(char::is_whitespace)
             .unwrap_or(self.lexing_line.len());
 
-        debug_assert!(self.current_location.pos.is_some());
-        self.current_location.pos.as_mut().unwrap().col += token_end;
-
         let text = self.lexing_line.drain(..token_end).collect::<String>();
         self.lexing_line = self.lexing_line.trim_start().to_owned();
+
+        debug_assert!(self.current_location.pos.is_some());
+        self.current_location.pos.as_mut().unwrap().col += initial_len - self.lexing_line.len();
 
         let typ = if let Ok(val) = text.parse::<u64>() {
             TokenType::Int(val)

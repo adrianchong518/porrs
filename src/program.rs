@@ -2,6 +2,8 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::lex::Lexer;
+use crate::parse;
+use crate::parse::Op;
 
 #[derive(Clone, Debug)]
 pub(crate) struct FilePosition {
@@ -49,5 +51,10 @@ impl Program {
             file_path: path.to_path_buf(),
             lexer,
         }
+    }
+
+    pub(crate) fn next_op(&mut self) -> Option<Op> {
+        let token = self.lexer.next_token()?;
+        Some(parse::parse_token(token))
     }
 }
