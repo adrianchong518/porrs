@@ -1,0 +1,10 @@
+[package]
+name = "porrs-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+porrs = { path = "../" }
+clap = { version = "3.0.10", features = ["derive"] }
+log = "0.4.14"
+env_logger = "0.9.0"
