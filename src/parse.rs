@@ -8,7 +8,7 @@ pub(crate) enum OpType {
     Intrinsic(IntrinsicType),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub(crate) enum IntrinsicType {
     Plus,
     Subtract,
@@ -34,6 +34,16 @@ impl IntrinsicType {
 pub struct Op {
     pub(crate) typ: OpType,
     pub(crate) token: Token,
+}
+
+pub(crate) struct Block {
+    pub(crate) ops: Vec<Op>,
+}
+
+impl Block {
+    pub(crate) fn from_vec(ops: Vec<Op>) -> Self {
+        Self { ops }
+    }
 }
 
 pub(crate) fn parse_token(token: Token) -> Op {

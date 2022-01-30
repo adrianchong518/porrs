@@ -2,8 +2,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::lex::Lexer;
-use crate::parse;
-use crate::parse::Op;
+use crate::parse::{parse_token, Block};
 
 #[derive(Clone, Debug)]
 pub(crate) struct FilePosition {
@@ -40,21 +39,18 @@ impl fmt::Display for FileLocation {
 
 pub struct Program {
     file_path: PathBuf,
-    pub(crate) lexer: Lexer,
+    pub(crate) root_block: Block,
 }
 
 impl Program {
     pub fn from_path(path: &Path) -> Self {
-        let lexer = Lexer::from_path(path);
+        let ops = Lexer::from_path(path).map(parse_token).collect();
+
+        log::info!("Parsed file {}", path.display());
 
         Program {
             file_path: path.to_path_buf(),
-            lexer,
+            root_block: Block::from_vec(ops),
         }
-    }
-
-    pub(crate) fn next_op(&mut self) -> Option<Op> {
-        let token = self.lexer.next_token()?;
-        Some(parse::parse_token(token))
     }
 }

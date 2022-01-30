@@ -1,4 +1,5 @@
 use std::path;
+use std::process::exit;
 
 use clap::{AppSettings, Parser, Subcommand};
 
@@ -45,7 +46,12 @@ fn main() {
     let program = porrs::Program::from_path(&config.source_file);
 
     match config.execution_mode {
-        ExecutionMode::Simulate => porrs::Simulation::new(program).simulate(),
+        ExecutionMode::Simulate => {
+            if let Err(err) = porrs::simulate(&program) {
+                log::error!("{}", err);
+                exit(1);
+            }
+        }
         ExecutionMode::NativeCompile => unimplemented!("File compilation is not yet implemented"),
-    }
+    };
 }
