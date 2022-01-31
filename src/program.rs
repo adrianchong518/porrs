@@ -2,7 +2,8 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::lex::Lexer;
-use crate::parse::{parse_token, Block};
+use crate::parse::{parse_token_block, OpBlock};
+use crate::Error;
 
 #[derive(Clone, Debug)]
 pub(crate) struct FilePosition {
@@ -38,19 +39,16 @@ impl fmt::Display for FileLocation {
 }
 
 pub struct Program {
-    file_path: PathBuf,
-    pub(crate) root_block: Block,
+    pub(crate) root_block: OpBlock,
 }
 
 impl Program {
-    pub fn from_path(path: &Path) -> Self {
-        let ops = Lexer::from_path(path).map(parse_token).collect();
+    pub fn from_path(path: &Path) -> Result<Self, Error> {
+        let root_block = parse_token_block(&Lexer::from_path(path).token_block()?);
 
-        log::info!("Parsed file {}", path.display());
+        log::info!("Parsed program at file: {}", path.display());
+        log::trace!("Root Block: {:#?}", root_block);
 
-        Program {
-            file_path: path.to_path_buf(),
-            root_block: Block::from_vec(ops),
-        }
+        Ok(Program { root_block })
     }
 }

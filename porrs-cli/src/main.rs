@@ -37,21 +37,23 @@ fn init_logger() {
     Builder::from_env(env).format_timestamp(None).init();
 }
 
+fn run(config: &Config) -> Result<(), porrs::Error> {
+    let program = porrs::Program::from_path(&config.source_file)?;
+
+    match config.execution_mode {
+        ExecutionMode::Simulate => porrs::simulate(&program),
+        ExecutionMode::NativeCompile => unimplemented!("File compilation is not yet implemented"),
+    }
+}
+
 fn main() {
     init_logger();
 
     let config = Config::parse();
     log::debug!("CLI Config: {:#?}", config);
 
-    let program = porrs::Program::from_path(&config.source_file);
-
-    match config.execution_mode {
-        ExecutionMode::Simulate => {
-            if let Err(err) = porrs::simulate(&program) {
-                log::error!("{}", err);
-                exit(1);
-            }
-        }
-        ExecutionMode::NativeCompile => unimplemented!("File compilation is not yet implemented"),
-    };
+    if let Err(err) = run(&config) {
+        log::error!("{}", err);
+        exit(1);
+    }
 }

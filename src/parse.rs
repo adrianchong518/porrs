@@ -1,11 +1,14 @@
 use std::process::exit;
+use std::rc::Rc;
 
-use crate::lex::{Token, TokenType};
+use crate::lex::{Token, TokenBlock, TokenType};
 
 #[derive(Debug)]
 pub(crate) enum OpType {
     PushInt(u64),
     Intrinsic(IntrinsicType),
+    If(OpBlock),
+    End,
 }
 
 #[derive(Debug)]
@@ -33,34 +36,52 @@ impl IntrinsicType {
 #[derive(Debug)]
 pub struct Op {
     pub(crate) typ: OpType,
-    pub(crate) token: Token,
+    pub(crate) token: Rc<Token>,
 }
 
-pub(crate) struct Block {
+#[derive(Debug)]
+pub(crate) struct OpBlock {
     pub(crate) ops: Vec<Op>,
 }
 
-impl Block {
-    pub(crate) fn from_vec(ops: Vec<Op>) -> Self {
+impl From<Vec<Op>> for OpBlock {
+    fn from(ops: Vec<Op>) -> Self {
         Self { ops }
     }
 }
 
-pub(crate) fn parse_token(token: Token) -> Op {
-    let op = match token.typ {
+pub(crate) fn parse_token_block(block: &TokenBlock) -> OpBlock {
+    block
+        .tokens
+        .iter()
+        .map(parse_token)
+        .collect::<Vec<Op>>()
+        .into()
+}
+
+fn parse_token(token: &Rc<Token>) -> Op {
+    let op = match &token.typ {
         TokenType::Word => parse_word(token),
         TokenType::Int(val) => Op {
-            typ: OpType::PushInt(val),
-            token,
+            typ: OpType::PushInt(*val),
+            token: Rc::clone(token),
+        },
+        TokenType::If(tok_block) => Op {
+            typ: OpType::If(parse_token_block(&tok_block)),
+            token: Rc::clone(token),
+        },
+        TokenType::End => Op {
+            typ: OpType::End,
+            token: Rc::clone(token),
         },
     };
 
-    log::trace!("Parsed token as operation: {:?}", op);
+    log::trace!("Parsed token as operation: {:#?}", op);
 
     op
 }
 
-fn parse_word(token: Token) -> Op {
+fn parse_word(token: &Rc<Token>) -> Op {
     let intrinsic_type = IntrinsicType::from_word(&token.text).unwrap_or_else(|| {
         log::error!("--- {} --- Unknown word `{}`", token.loc, token.text);
         exit(1)
@@ -68,6 +89,6 @@ fn parse_word(token: Token) -> Op {
 
     Op {
         typ: OpType::Intrinsic(intrinsic_type),
-        token,
+        token: Rc::clone(token),
     }
 }

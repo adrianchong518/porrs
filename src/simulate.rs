@@ -1,50 +1,23 @@
-use std::{error, fmt};
+use std::fmt;
 
 use crate::lex::Token;
-use crate::parse::{IntrinsicType, OpType};
-use crate::program::{FileLocation, Program};
+use crate::parse::{IntrinsicType, OpBlock, OpType};
+use crate::program::Program;
+use crate::Error;
 
 #[derive(Debug)]
-enum ErrorKind {
+pub(crate) enum SimulationError {
     StackUnderflow,
 }
 
-impl ErrorKind {
-    fn as_str(&self) -> &str {
+impl fmt::Display for SimulationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use SimulationError::*;
         match self {
-            Self::StackUnderflow => "Stack underflowed",
+            StackUnderflow => write!(f, "Stack underflowed"),
         }
     }
 }
-
-#[derive(Debug)]
-pub struct Error {
-    kind: ErrorKind,
-    loc: Option<FileLocation>,
-}
-
-impl From<ErrorKind> for Error {
-    fn from(kind: ErrorKind) -> Self {
-        Self { kind, loc: None }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "--- {} --- {}",
-            if let Some(loc) = &self.loc {
-                loc.to_string()
-            } else {
-                "Unknown Location".to_string()
-            },
-            self.kind.as_str()
-        )
-    }
-}
-
-impl error::Error for Error {}
 
 struct Stack(Vec<u64>);
 
@@ -60,7 +33,7 @@ impl Stack {
     fn pop(&mut self) -> Result<u64, Error> {
         match self.0.pop() {
             Some(val) => Ok(val),
-            None => Err(ErrorKind::StackUnderflow.into()),
+            None => Err(Error::from(SimulationError::StackUnderflow)),
         }
     }
 }
@@ -68,15 +41,20 @@ impl Stack {
 pub fn simulate(program: &Program) -> Result<(), Error> {
     let mut stack = Stack::new();
 
-    for op in &program.root_block.ops {
-        let result = match &op.typ {
+    simulate_op_block(&mut stack, &program.root_block)
+}
+
+fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error> {
+    for op in &op_block.ops {
+        let result: Result<(), Error> = match &op.typ {
             OpType::PushInt(val) => Ok(stack.push(*val)),
-            OpType::Intrinsic(intr) => simulate_intrinsic(&mut stack, intr, &op.token),
+            OpType::Intrinsic(intr) => simulate_intrinsic(stack, intr, &op.token),
+            OpType::If(op_block) => simulate_if(stack, op_block, &op.token),
+            OpType::End => Ok(()),
         };
 
-        if let Err(mut err) = result {
-            err.loc = Some(op.token.loc.clone());
-            return Err(err);
+        if let Err(err) = result {
+            return Err(err.push_loc(&op.token.loc));
         }
     }
 
@@ -128,4 +106,22 @@ fn simulate_intrinsic(
     }
 
     Ok(())
+}
+
+fn simulate_if(stack: &mut Stack, op_block: &OpBlock, token: &Token) -> Result<(), Error> {
+    let cond = stack.pop()?;
+
+    if cond > 0 {
+        if cond > 1 {
+            log::warn!(
+                "--- {} --- Used non-binary value ({}) as condition for `if`",
+                token.loc,
+                cond
+            );
+        }
+
+        simulate_op_block(stack, op_block)
+    } else {
+        Ok(())
+    }
 }
