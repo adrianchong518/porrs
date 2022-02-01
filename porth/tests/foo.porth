@@ -8,7 +8,9 @@
 38 9 divmod print print
 
 0 if
-    13 11 + print
+    + print
+else
+    3562 13 + print
 end
 
 1 if

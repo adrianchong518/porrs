@@ -2,7 +2,8 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::lex::Lexer;
-use crate::parse::{parse_token_block, OpBlock};
+use crate::op::OpBlock;
+use crate::parse::Parser;
 use crate::Error;
 
 #[derive(Clone, Debug)]
@@ -44,7 +45,9 @@ pub struct Program {
 
 impl Program {
     pub fn from_path(path: &Path) -> Result<Self, Error> {
-        let root_block = parse_token_block(&Lexer::from_path(path).token_block()?);
+        let lexer = Lexer::from_path(path);
+        let parser = Parser::from_lexer(lexer);
+        let root_block = parser.into_root_block()?;
 
         log::info!("Parsed program at file: {}", path.display());
         log::trace!("Root Block: {:#?}", root_block);

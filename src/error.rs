@@ -1,12 +1,14 @@
 use std::{error, fmt};
 
 use crate::lex::LexingError;
+use crate::parse::ParsingError;
 use crate::program::FileLocation;
 use crate::simulate::SimulationError;
 
 #[derive(Debug)]
 enum ErrorKind {
     Lexing(LexingError),
+    Parsing(ParsingError),
     Simulation(SimulationError),
 }
 
@@ -15,11 +17,13 @@ impl fmt::Display for ErrorKind {
         use ErrorKind::*;
         match self {
             Lexing(err) => write!(f, "[Lexing] {}", err),
+            Parsing(err) => write!(f, "[Parsing] {}", err),
             Simulation(err) => write!(f, "[Simulation] {}", err),
         }
     }
 }
 
+// TODO Add an info stack
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -27,7 +31,7 @@ pub struct Error {
 }
 
 impl Error {
-    pub(crate) fn push_loc(mut self, loc: &FileLocation) -> Self {
+    pub(crate) fn push_loc(mut self, loc: FileLocation) -> Self {
         self.loc_stack.push(loc.clone());
         self
     }
@@ -51,6 +55,12 @@ impl From<SimulationError> for Error {
 impl From<LexingError> for Error {
     fn from(err: LexingError) -> Self {
         Self::from(ErrorKind::Lexing(err))
+    }
+}
+
+impl From<ParsingError> for Error {
+    fn from(err: ParsingError) -> Self {
+        Self::from(ErrorKind::Parsing(err))
     }
 }
 

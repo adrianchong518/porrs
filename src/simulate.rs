@@ -1,8 +1,7 @@
 use std::fmt;
 
-use crate::lex::Token;
-use crate::parse::{IntrinsicType, OpBlock, OpType};
-use crate::program::Program;
+use crate::op::{IfOp, Intrinsic, OpBlock, OpType};
+use crate::program::{FileLocation, Program};
 use crate::Error;
 
 #[derive(Debug)]
@@ -45,16 +44,15 @@ pub fn simulate(program: &Program) -> Result<(), Error> {
 }
 
 fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error> {
-    for op in &op_block.ops {
+    for op in &op_block.0 {
         let result: Result<(), Error> = match &op.typ {
             OpType::PushInt(val) => Ok(stack.push(*val)),
-            OpType::Intrinsic(intr) => simulate_intrinsic(stack, intr, &op.token),
-            OpType::If(op_block) => simulate_if(stack, op_block, &op.token),
-            OpType::End => Ok(()),
+            OpType::Intrinsic(intr) => simulate_intrinsic(stack, &intr, &op.loc),
+            OpType::If(if_op) => simulate_if(stack, if_op, &op.loc),
         };
 
         if let Err(err) = result {
-            return Err(err.push_loc(&op.token.loc));
+            return Err(err.push_loc(op.loc.clone()));
         }
     }
 
@@ -63,44 +61,44 @@ fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error>
 
 fn simulate_intrinsic(
     stack: &mut Stack,
-    intrinsic: &IntrinsicType,
-    token: &Token,
+    intrinsic: &Intrinsic,
+    loc: &FileLocation,
 ) -> Result<(), Error> {
     match intrinsic {
-        IntrinsicType::Plus => {
+        Intrinsic::Plus => {
             let b = stack.pop()?;
             let a = stack.pop()?;
             let result = a.checked_add(b).unwrap_or_else(|| {
-                log::warn!("--- {} --- Operation `+` overflowed", token.loc);
+                log::warn!("--- {} --- Operation `+` overflowed", loc);
                 a.wrapping_add(b)
             });
             stack.push(result);
         }
 
-        IntrinsicType::Subtract => {
+        Intrinsic::Subtract => {
             let b = stack.pop()?;
             let a = stack.pop()?;
             let result = a.checked_sub(b).unwrap_or_else(|| {
-                log::warn!("--- {} --- Operation `-` overflowed", token.loc);
+                log::warn!("--- {} --- Operation `-` overflowed", loc);
                 a.wrapping_sub(b)
             });
             stack.push(result);
         }
 
-        IntrinsicType::Multiply => {
+        Intrinsic::Multiply => {
             let b = stack.pop()?;
             let a = stack.pop()?;
             stack.push(a * b);
         }
 
-        IntrinsicType::DivMod => {
+        Intrinsic::DivMod => {
             let b = stack.pop()?;
             let a = stack.pop()?;
             stack.push(a / b);
             stack.push(a % b);
         }
 
-        IntrinsicType::Print => {
+        Intrinsic::Print => {
             println!("{val} ({val:#018x})", val = stack.pop()?);
         }
     }
@@ -108,20 +106,24 @@ fn simulate_intrinsic(
     Ok(())
 }
 
-fn simulate_if(stack: &mut Stack, op_block: &OpBlock, token: &Token) -> Result<(), Error> {
+fn simulate_if(stack: &mut Stack, if_op: &IfOp, loc: &FileLocation) -> Result<(), Error> {
     let cond = stack.pop()?;
 
-    if cond > 0 {
+    if cond == 0 {
+        if let Some(else_block) = &if_op.else_block {
+            simulate_op_block(stack, &else_block)
+        } else {
+            Ok(())
+        }
+    } else {
         if cond > 1 {
             log::warn!(
-                "--- {} --- Used non-binary value ({}) as condition for `if`",
-                token.loc,
+                "--- {} --- Non-binary value ({}) used as a boolean condition",
+                loc,
                 cond
             );
         }
 
-        simulate_op_block(stack, op_block)
-    } else {
-        Ok(())
+        simulate_op_block(stack, &if_op.if_block)
     }
 }

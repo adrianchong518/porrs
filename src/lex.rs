@@ -3,47 +3,17 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::exit;
-use std::rc::Rc;
 
 use crate::program::{FileLocation, FilePosition};
+use crate::token::{Token, TokenType};
 use crate::Error;
 
 #[derive(Debug)]
-pub(crate) enum TokenType {
-    Word,
-    Int(u64),
-    If(TokenBlock),
-    End,
-}
-
-impl TokenType {
-    const IF_TEXT: &'static str = "if";
-    const END_TEXT: &'static str = "end";
-}
-
-#[derive(Debug)]
-pub(crate) struct Token {
-    pub(crate) typ: TokenType,
-    pub(crate) text: String,
-    pub(crate) loc: FileLocation,
-}
-
-#[derive(Debug)]
-pub(crate) struct TokenBlock {
-    pub(crate) tokens: Vec<Rc<Token>>,
-}
-
-#[derive(Debug)]
-pub(crate) enum LexingError {
-    BlockNotClosed,
-}
+pub(crate) enum LexingError {}
 
 impl fmt::Display for LexingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use LexingError::*;
-        match self {
-            BlockNotClosed => write!(f, "Expected token `{}` to end a block", TokenType::END_TEXT),
-        }
+        write!(f, "[Lexing] Error")
     }
 }
 
@@ -68,17 +38,9 @@ impl Lexer {
         }
     }
 
-    pub(crate) fn token_block(mut self) -> Result<TokenBlock, Error> {
-        let mut tokens = Vec::new();
-
-        while let Some(tok) = self.next_token()? {
-            tokens.push(Rc::new(tok));
-        }
-
-        Ok(TokenBlock { tokens })
-    }
-
     pub(crate) fn next_token(&mut self) -> Result<Option<Token>, Error> {
+        let vec = vec![1];
+        vec.iter();
         let (text, loc) = {
             let mut loc = self.current_location.clone();
             let mut text = "".to_owned();
@@ -109,21 +71,17 @@ impl Lexer {
             (text, loc)
         };
 
-        let typ = if let Ok(val) = text.parse::<u64>() {
-            TokenType::Int(val)
-        } else if text == TokenType::IF_TEXT {
-            TokenType::If(self.lex_block()?)
-        } else if text == TokenType::END_TEXT {
-            TokenType::End
-        } else {
-            TokenType::Word
-        };
+        let typ = TokenType::from_str(&text);
 
-        let token = Token { typ, text, loc };
+        let token = Token { typ, loc };
 
         log::trace!("Lexed token: {:#?}", token);
 
         Ok(Some(token))
+    }
+
+    pub(crate) fn current_location(&self) -> FileLocation {
+        self.current_location.clone()
     }
 
     fn next_line(&mut self) -> Option<()> {
@@ -155,20 +113,5 @@ impl Lexer {
         }
 
         Some(())
-    }
-
-    fn lex_block(&mut self) -> Result<TokenBlock, Error> {
-        let mut tokens = Vec::new();
-
-        while let Some(token) = self.next_token()? {
-            if let TokenType::End = token.typ {
-                tokens.push(Rc::new(token));
-                return Ok(TokenBlock { tokens });
-            }
-
-            tokens.push(Rc::new(token));
-        }
-
-        Err(Error::from(LexingError::BlockNotClosed).push_loc(&self.current_location))
     }
 }
