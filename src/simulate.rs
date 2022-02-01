@@ -65,6 +65,45 @@ fn simulate_intrinsic(
     loc: &FileLocation,
 ) -> Result<(), Error> {
     match intrinsic {
+        Intrinsic::Dup => {
+            let a = stack.pop()?;
+            stack.push(a);
+            stack.push(a);
+        }
+
+        Intrinsic::Swap => {
+            let b = stack.pop()?;
+            let a = stack.pop()?;
+            stack.push(b);
+            stack.push(a);
+        }
+
+        Intrinsic::Drop => {
+            let _ = stack.pop()?;
+        }
+
+        Intrinsic::Print => {
+            println!("{val} ({val:#018x})", val = stack.pop()?);
+        }
+
+        Intrinsic::Over => {
+            let b = stack.pop()?;
+            let a = stack.pop()?;
+            stack.push(a);
+            stack.push(b);
+            stack.push(a);
+        }
+
+        Intrinsic::Rot => {
+            let c = stack.pop()?;
+            let b = stack.pop()?;
+            let a = stack.pop()?;
+
+            stack.push(b);
+            stack.push(c);
+            stack.push(a);
+        }
+
         Intrinsic::Plus => {
             let b = stack.pop()?;
             let a = stack.pop()?;
@@ -96,10 +135,6 @@ fn simulate_intrinsic(
             let a = stack.pop()?;
             stack.push(a / b);
             stack.push(a % b);
-        }
-
-        Intrinsic::Print => {
-            println!("{val} ({val:#018x})", val = stack.pop()?);
         }
     }
 

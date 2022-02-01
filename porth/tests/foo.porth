@@ -9,7 +9,7 @@
 
 0 if
     + print
-else
+//else
     3562 13 + print
 end
 

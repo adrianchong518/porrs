@@ -18,21 +18,32 @@ pub(crate) enum OpType {
 
 #[derive(Debug)]
 pub(crate) enum Intrinsic {
+    Dup,
+    Swap,
+    Drop,
+    Print,
+    Over,
+    Rot,
+
     Plus,
     Subtract,
     Multiply,
     DivMod,
-    Print,
 }
 
 impl Intrinsic {
     pub(crate) fn from_str(text: &str) -> Option<Self> {
         match text {
+            "dup" => Some(Self::Dup),
+            "swap" => Some(Self::Swap),
+            "drop" => Some(Self::Drop),
+            "print" => Some(Self::Print),
+            "over" => Some(Self::Over),
+            "rot" => Some(Self::Rot),
             "+" => Some(Self::Plus),
             "-" => Some(Self::Subtract),
             "*" => Some(Self::Multiply),
             "divmod" => Some(Self::DivMod),
-            "print" => Some(Self::Print),
             _ => None,
         }
     }

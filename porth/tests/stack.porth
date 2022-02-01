@@ -1,0 +1,22 @@
+// dup
+420 dup dup print print print
+69 dup print dup print print
+
+// 2dup
+69 420 over over print print print print
+
+// swap
+69 420 swap print print
+
+// drop
+69 420 drop print
+
+// over
+69 420 over print drop drop
+
+// big number
+1234567890987654321 print
+
+// rot
+1 2 3 print print print
+1 2 3 rot print print print

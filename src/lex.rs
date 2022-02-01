@@ -39,8 +39,6 @@ impl Lexer {
     }
 
     pub(crate) fn next_token(&mut self) -> Result<Option<Token>, Error> {
-        let vec = vec![1];
-        vec.iter();
         let (text, loc) = {
             let mut loc = self.current_location.clone();
             let mut text = "".to_owned();
@@ -50,6 +48,11 @@ impl Lexer {
                     if let None = self.next_line() {
                         return Ok(None);
                     }
+                }
+
+                if self.lexing_line.starts_with("//") {
+                    self.lexing_line.clear();
+                    continue;
                 }
 
                 loc = self.current_location.clone();
