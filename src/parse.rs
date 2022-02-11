@@ -43,13 +43,13 @@ impl Parser {
     }
 
     pub(crate) fn into_root_block(mut self) -> Result<OpBlock, Error> {
-        let mut ops = Vec::new();
+        let mut op_block = OpBlock::new();
 
         while let Some(parsed) = self.parse_next_token()? {
             match parsed {
                 Parsed::Op(op) => {
                     log::trace!("Parsed token as operation: {:#?}", op);
-                    ops.push(op);
+                    op_block.push(op);
                 }
 
                 Parsed::Marker { marker, loc } => {
@@ -61,7 +61,7 @@ impl Parser {
             }
         }
 
-        Ok(OpBlock(ops))
+        Ok(op_block)
     }
 
     fn parse_next_token(&mut self) -> Result<Option<Parsed>, Error> {
@@ -100,46 +100,65 @@ impl Parser {
     fn parse_block_marker(&mut self, marker: Marker, loc: FileLocation) -> Result<Parsed, Error> {
         match marker {
             Marker::If => self.parse_if(loc).map(|op| Parsed::Op(op)),
-            Marker::Else | Marker::End => Ok(Parsed::Marker { marker, loc }),
+            Marker::IfStar | Marker::Else | Marker::End => Ok(Parsed::Marker { marker, loc }),
         }
     }
 
     fn parse_if(&mut self, if_loc: FileLocation) -> Result<Op, Error> {
         enum ParseState {
             If,
+            IfStar,
             Else,
         }
 
-        let mut if_op = IfOp {
-            if_block: OpBlock(Vec::new()),
-            else_block: None,
-        };
-
+        let mut if_op = IfOp::new();
         let mut parse_state = ParseState::If;
 
         while let Some(parsed) = self.parse_next_token()? {
             match parsed {
                 Parsed::Op(op) => match parse_state {
-                    ParseState::If => if_op.if_block.0.push(op),
-                    ParseState::Else => if_op.else_block.as_mut().unwrap().0.push(op),
+                    ParseState::If => if_op.if_block.push(op),
+                    ParseState::IfStar => if_op.if_star_blocks.last_mut().unwrap().inner.push(op),
+                    ParseState::Else => if_op.else_block.as_mut().unwrap().push(op),
                 },
 
                 Parsed::Marker { marker, loc } => match marker {
                     Marker::Else => match parse_state {
-                        ParseState::If => {
+                        ParseState::If | ParseState::IfStar => {
                             parse_state = ParseState::Else;
-                            if_op.else_block = Some(OpBlock(Vec::new()));
+                            if_op.else_block = Some(OpBlock::new());
                         }
+
                         ParseState::Else => {
                             return Err(Error::from(ParsingError::UnexpectedMarker(
                                 marker,
-                                format!(
-                                    "`{}` cannot appear twice for one `{}` block",
-                                    Marker::Else,
-                                    Marker::If
-                                ),
+                                format!("`{}` cannot appear twice in succession", Marker::Else),
                             ))
                             .push_loc(loc));
+                        }
+                    },
+
+                    Marker::IfStar => match parse_state {
+                        ParseState::Else => {
+                            let cond = if_op.else_block.take().unwrap();
+                            if_op.if_star_blocks.push(crate::op::IfStarBlock {
+                                loc,
+                                cond,
+                                inner: OpBlock::new(),
+                            });
+
+                            parse_state = ParseState::IfStar;
+                        }
+
+                        _ => {
+                            return Err(Error::from(ParsingError::UnexpectedMarker(
+                                marker,
+                                format!(
+                                    "`{}` must follow a `{}` token with a condition block",
+                                    Marker::IfStar,
+                                    Marker::Else
+                                ),
+                            )))
                         }
                     },
 

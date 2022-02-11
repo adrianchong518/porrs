@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::op::{IfOp, Intrinsic, OpBlock, OpType};
+use crate::op::{IfOp, IfStarBlock, Intrinsic, OpBlock, OpType};
 use crate::program::{FileLocation, Program};
 use crate::Error;
 
@@ -44,7 +44,7 @@ pub fn simulate(program: &Program) -> Result<(), Error> {
 }
 
 fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error> {
-    for op in &op_block.0 {
+    for op in op_block.iter() {
         let result: Result<(), Error> = match &op.typ {
             OpType::PushInt(val) => Ok(stack.push(*val)),
             OpType::Intrinsic(intr) => simulate_intrinsic(stack, &intr, &op.loc),
@@ -141,24 +141,34 @@ fn simulate_intrinsic(
     Ok(())
 }
 
-fn simulate_if(stack: &mut Stack, if_op: &IfOp, loc: &FileLocation) -> Result<(), Error> {
-    let cond = stack.pop()?;
+fn is_condition_true(cond: u64, loc: &FileLocation) -> bool {
+    if cond > 1 {
+        log::warn!(
+            "--- {} --- Non-binary value ({}) used as a boolean condition",
+            loc,
+            cond
+        );
+    }
 
-    if cond == 0 {
+    cond > 0
+}
+
+fn simulate_if(stack: &mut Stack, if_op: &IfOp, loc: &FileLocation) -> Result<(), Error> {
+    if is_condition_true(stack.pop()?, loc) {
+        simulate_op_block(stack, &if_op.if_block)
+    } else {
+        for IfStarBlock { loc, cond, inner } in &if_op.if_star_blocks {
+            simulate_op_block(stack, cond)?;
+
+            if is_condition_true(stack.pop()?, loc) {
+                return simulate_op_block(stack, inner);
+            }
+        }
+
         if let Some(else_block) = &if_op.else_block {
-            simulate_op_block(stack, &else_block)
+            simulate_op_block(stack, else_block)
         } else {
             Ok(())
         }
-    } else {
-        if cond > 1 {
-            log::warn!(
-                "--- {} --- Non-binary value ({}) used as a boolean condition",
-                loc,
-                cond
-            );
-        }
-
-        simulate_op_block(stack, &if_op.if_block)
     }
 }

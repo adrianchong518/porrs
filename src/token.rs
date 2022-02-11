@@ -30,27 +30,31 @@ impl<'token> TokenType {
 #[derive(Debug)]
 pub(crate) enum Marker {
     If,
+    IfStar,
     Else,
     End,
 }
 
 impl Marker {
     const IF_TEXT: &'static str = "if";
+    const IF_STAR_TEXT: &'static str = "if*";
     const ELSE_TEXT: &'static str = "else";
     const END_TEXT: &'static str = "end";
 
     fn from_str(text: &str) -> Option<Self> {
         match text {
             Self::IF_TEXT => Some(Self::If),
+            Self::IF_STAR_TEXT => Some(Self::IfStar),
             Self::ELSE_TEXT => Some(Self::Else),
             Self::END_TEXT => Some(Self::End),
             _ => None,
         }
     }
 
-    fn as_str(&self) -> &'static str {
+    const fn as_str(&self) -> &'static str {
         match self {
             Self::If => Self::IF_TEXT,
+            Self::IfStar => Self::IF_STAR_TEXT,
             Self::Else => Self::ELSE_TEXT,
             Self::End => Self::END_TEXT,
         }
