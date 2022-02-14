@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::op::{IfOp, IfStarBlock, Intrinsic, OpBlock, OpType};
+use crate::op::{If, IfStarBlock, Intrinsic, OpBlock, OpType, While};
 use crate::program::{FileLocation, Program};
 use crate::Error;
 
@@ -49,10 +49,15 @@ fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error>
             OpType::PushInt(val) => Ok(stack.push(*val)),
             OpType::Intrinsic(intr) => simulate_intrinsic(stack, &intr, &op.loc),
             OpType::If(if_op) => simulate_if(stack, if_op, &op.loc),
+            OpType::While(while_op) => simulate_while(stack, while_op),
         };
 
         if let Err(err) = result {
-            return Err(err.push_loc(op.loc.clone()));
+            if err.has_loc() {
+                return Err(err);
+            } else {
+                return Err(err.add_loc(op.loc.clone()));
+            }
         }
     }
 
@@ -98,7 +103,6 @@ fn simulate_intrinsic(
             let c = stack.pop()?;
             let b = stack.pop()?;
             let a = stack.pop()?;
-
             stack.push(b);
             stack.push(c);
             stack.push(a);
@@ -108,7 +112,7 @@ fn simulate_intrinsic(
             let b = stack.pop()?;
             let a = stack.pop()?;
             let result = a.checked_add(b).unwrap_or_else(|| {
-                log::warn!("--- {} --- Operation `+` overflowed", loc);
+                log::warn!("<-- {} --> Operation `+` overflowed", loc);
                 a.wrapping_add(b)
             });
             stack.push(result);
@@ -118,7 +122,7 @@ fn simulate_intrinsic(
             let b = stack.pop()?;
             let a = stack.pop()?;
             let result = a.checked_sub(b).unwrap_or_else(|| {
-                log::warn!("--- {} --- Operation `-` overflowed", loc);
+                log::warn!("<-- {} --> Operation `-` overflowed", loc);
                 a.wrapping_sub(b)
             });
             stack.push(result);
@@ -144,7 +148,7 @@ fn simulate_intrinsic(
 fn is_condition_true(cond: u64, loc: &FileLocation) -> bool {
     if cond > 1 {
         log::warn!(
-            "--- {} --- Non-binary value ({}) used as a boolean condition",
+            "<-- {} --> Non-binary value ({}) used as a boolean condition",
             loc,
             cond
         );
@@ -153,8 +157,8 @@ fn is_condition_true(cond: u64, loc: &FileLocation) -> bool {
     cond > 0
 }
 
-fn simulate_if(stack: &mut Stack, if_op: &IfOp, loc: &FileLocation) -> Result<(), Error> {
-    if is_condition_true(stack.pop()?, loc) {
+fn simulate_if(stack: &mut Stack, if_op: &If, if_loc: &FileLocation) -> Result<(), Error> {
+    if is_condition_true(stack.pop()?, if_loc) {
         simulate_op_block(stack, &if_op.if_block)
     } else {
         for IfStarBlock { loc, cond, inner } in &if_op.if_star_blocks {
@@ -171,4 +175,20 @@ fn simulate_if(stack: &mut Stack, if_op: &IfOp, loc: &FileLocation) -> Result<()
             Ok(())
         }
     }
+}
+
+fn simulate_while(stack: &mut Stack, while_op: &While) -> Result<(), Error> {
+    let do_loc = while_op.do_loc.as_ref().unwrap();
+
+    simulate_op_block(stack, &while_op.cond_block)?;
+
+    while is_condition_true(
+        stack.pop().map_err(|err| err.add_loc(do_loc.clone()))?,
+        do_loc,
+    ) {
+        simulate_op_block(stack, &while_op.do_block)?;
+        simulate_op_block(stack, &while_op.cond_block)?;
+    }
+
+    Ok(())
 }

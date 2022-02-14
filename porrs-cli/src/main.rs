@@ -53,7 +53,11 @@ fn main() {
     log::debug!("CLI Config: {:#?}", config);
 
     if let Err(err) = run(&config) {
-        log::error!("{}", err);
+        eprintln!("ERROR | {}", err);
+        for info in err.info_stack() {
+            eprintln!("NOTE  | {}", info)
+        }
+
         exit(1);
     }
 }

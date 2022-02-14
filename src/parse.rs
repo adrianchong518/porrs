@@ -1,27 +1,96 @@
 use std::fmt;
 
+use crate::error::InfoKind;
 use crate::lex::Lexer;
-use crate::op::{IfOp, Intrinsic, Op, OpBlock, OpType};
+use crate::op::{If, Intrinsic, Op, OpBlock, OpType, While};
 use crate::program::FileLocation;
 use crate::token::{Marker, TokenType};
 use crate::Error;
 
 #[derive(Debug)]
 pub(crate) enum ParsingError {
-    UnexpectedMarker(Marker, String),
+    UnexpectedMarker(Marker, UnexpectedMarker),
+    MissingMarker(Marker, MissingMarker),
     UnknownWord(String),
-    BlockNotClosed,
 }
 
 impl fmt::Display for ParsingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsingError::UnexpectedMarker(marker, msg) => {
-                write!(f, "Unexpected block marker `{}`: {}", marker, msg)
+            Self::UnexpectedMarker(marker, err) => {
+                write!(f, "Unexpected token `{}`: {}", marker, err)
             }
-            ParsingError::UnknownWord(text) => write!(f, "Unknown word: `{}`", text),
-            ParsingError::BlockNotClosed => {
-                write!(f, "Expected an `{}` token to end a block", Marker::End)
+
+            Self::MissingMarker(marker, err) => {
+                write!(f, "Missing expected token `{}`: {}", marker, err)
+            }
+
+            Self::UnknownWord(text) => write!(f, "Unknown word: `{}`", text),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum MissingMarker {
+    BlockNotClosed,
+    RequiredByBlock(Marker, Marker),
+}
+
+impl MissingMarker {
+    fn into_error(self, marker: Marker) -> Error {
+        Error::from(ParsingError::MissingMarker(marker, self))
+    }
+}
+
+impl fmt::Display for MissingMarker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BlockNotClosed => {
+                write!(f, "Expected an `{}` token to end the block", Marker::End)
+            }
+
+            Self::RequiredByBlock(marker, block) => {
+                write!(
+                    f,
+                    "`{}` block is required to contain a `{}` block",
+                    block, marker
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum UnexpectedMarker {
+    General(String),
+    FreeFloating(Marker),
+    Repeated(Marker, Marker),
+    NotApplicable(Marker, Marker),
+}
+
+impl UnexpectedMarker {
+    fn into_error(self, marker: Marker) -> Error {
+        Error::from(ParsingError::UnexpectedMarker(marker, self))
+    }
+}
+
+impl fmt::Display for UnexpectedMarker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::General(msg) => write!(f, "{}", msg),
+
+            Self::FreeFloating(marker) => {
+                write!(f, "`{}` must be associated with a block", marker)
+            }
+
+            Self::Repeated(marker, block) => write!(
+                f,
+                "`{}` cannot appear twice in succession within the same `{}` block",
+                marker, block
+            ),
+
+            Self::NotApplicable(marker, block) => {
+                write!(f, "`{}` cannot appear with in an `{}` block", marker, block)
             }
         }
     }
@@ -53,10 +122,9 @@ impl Parser {
                 }
 
                 Parsed::Marker { marker, loc } => {
-                    let msg = format!("`{}` must be associated with a block", marker);
-                    return Err(
-                        Error::from(ParsingError::UnexpectedMarker(marker, msg)).push_loc(loc)
-                    );
+                    return Err(UnexpectedMarker::FreeFloating(marker)
+                        .into_error(marker)
+                        .add_loc(loc));
                 }
             }
         }
@@ -72,14 +140,14 @@ impl Parser {
         };
 
         let parsed = match token.typ {
-            TokenType::Word(ref text) => Parsed::Op(self.parse_word(&text, token.loc)?),
+            TokenType::Word(word) => Parsed::Op(self.parse_word(word.as_str(), token.loc)?),
 
             TokenType::Int(val) => Parsed::Op(Op {
                 typ: OpType::PushInt(val),
                 loc: token.loc,
             }),
 
-            TokenType::Marker(marker) => self.parse_block_marker(marker, token.loc)?,
+            TokenType::Marker(marker) => self.parse_marker(marker, token.loc)?,
         };
 
         log::trace!("Parsed token: {:#?}", parsed);
@@ -93,14 +161,15 @@ impl Parser {
                 typ: OpType::Intrinsic(intr),
                 loc,
             }),
-            None => Err(Error::from(ParsingError::UnknownWord(text.to_owned())).push_loc(loc)),
+            None => Err(Error::from(ParsingError::UnknownWord(text.to_owned())).add_loc(loc)),
         }
     }
 
-    fn parse_block_marker(&mut self, marker: Marker, loc: FileLocation) -> Result<Parsed, Error> {
+    fn parse_marker(&mut self, marker: Marker, loc: FileLocation) -> Result<Parsed, Error> {
         match marker {
             Marker::If => self.parse_if(loc).map(|op| Parsed::Op(op)),
-            Marker::IfStar | Marker::Else | Marker::End => Ok(Parsed::Marker { marker, loc }),
+            Marker::While => self.parse_while(loc).map(|op| Parsed::Op(op)),
+            _ => Ok(Parsed::Marker { marker, loc }),
         }
     }
 
@@ -111,7 +180,7 @@ impl Parser {
             Else,
         }
 
-        let mut if_op = IfOp::new();
+        let mut if_op = If::new();
         let mut parse_state = ParseState::If;
 
         while let Some(parsed) = self.parse_next_token()? {
@@ -130,11 +199,10 @@ impl Parser {
                         }
 
                         ParseState::Else => {
-                            return Err(Error::from(ParsingError::UnexpectedMarker(
-                                marker,
-                                format!("`{}` cannot appear twice in succession", Marker::Else),
-                            ))
-                            .push_loc(loc));
+                            return Err(UnexpectedMarker::Repeated(Marker::Else, Marker::If)
+                                .into_error(Marker::Else)
+                                .add_loc(loc)
+                                .push_info(InfoKind::BlockStart(Marker::If), if_loc));
                         }
                     },
 
@@ -151,14 +219,14 @@ impl Parser {
                         }
 
                         _ => {
-                            return Err(Error::from(ParsingError::UnexpectedMarker(
-                                marker,
-                                format!(
-                                    "`{}` must follow a `{}` token with a condition block",
-                                    Marker::IfStar,
-                                    Marker::Else
-                                ),
-                            )))
+                            return Err(UnexpectedMarker::General(format!(
+                                "`{}` must follow a `{}` with a condition block",
+                                Marker::IfStar,
+                                Marker::Else
+                            ))
+                            .into_error(Marker::IfStar)
+                            .add_loc(loc)
+                            .push_info(InfoKind::BlockStart(Marker::If), if_loc));
                         }
                     },
 
@@ -170,19 +238,80 @@ impl Parser {
                     }
 
                     _ => {
-                        let msg = format!(
-                            "`{}` cannot appear with in an `{}` block",
-                            marker,
-                            Marker::If
-                        );
-                        return Err(
-                            Error::from(ParsingError::UnexpectedMarker(marker, msg)).push_loc(loc)
-                        );
+                        return Err(UnexpectedMarker::NotApplicable(marker, Marker::If)
+                            .into_error(marker)
+                            .add_loc(loc)
+                            .push_info(InfoKind::BlockStart(Marker::If), if_loc));
                     }
                 },
             }
         }
 
-        Err(Error::from(ParsingError::BlockNotClosed).push_loc(self.lexer.current_location()))
+        Err(MissingMarker::BlockNotClosed
+            .into_error(Marker::End)
+            .add_loc(self.lexer.current_location())
+            .push_info(InfoKind::BlockStart(Marker::If), if_loc))
+    }
+
+    fn parse_while(&mut self, while_loc: FileLocation) -> Result<Op, Error> {
+        enum ParseState {
+            Cond,
+            Do,
+        }
+
+        let mut while_op = While::new();
+        let mut parse_state = ParseState::Cond;
+
+        while let Some(parsed) = self.parse_next_token()? {
+            match parsed {
+                Parsed::Op(op) => match parse_state {
+                    ParseState::Cond => while_op.cond_block.push(op),
+                    ParseState::Do => while_op.do_block.push(op),
+                },
+
+                Parsed::Marker { marker, loc } => match marker {
+                    Marker::Do => match parse_state {
+                        ParseState::Cond => {
+                            parse_state = ParseState::Do;
+                            while_op.do_loc = Some(loc);
+                        }
+
+                        ParseState::Do => {
+                            return Err(UnexpectedMarker::Repeated(Marker::Do, Marker::While)
+                                .into_error(Marker::Do)
+                                .add_loc(loc)
+                                .push_info(InfoKind::BlockStart(Marker::While), while_loc));
+                        }
+                    },
+
+                    Marker::End => match parse_state {
+                        ParseState::Cond => {
+                            return Err(MissingMarker::RequiredByBlock(Marker::Do, Marker::While)
+                                .into_error(Marker::Do)
+                                .add_loc(loc)
+                                .push_info(InfoKind::BlockStart(Marker::While), while_loc));
+                        }
+                        ParseState::Do => {
+                            return Ok(Op {
+                                typ: OpType::While(while_op),
+                                loc: while_loc,
+                            })
+                        }
+                    },
+
+                    _ => {
+                        return Err(UnexpectedMarker::NotApplicable(marker, Marker::If)
+                            .into_error(marker)
+                            .add_loc(loc)
+                            .push_info(InfoKind::BlockStart(Marker::While), while_loc));
+                    }
+                },
+            }
+        }
+
+        Err(MissingMarker::BlockNotClosed
+            .into_error(Marker::End)
+            .add_loc(self.lexer.current_location())
+            .push_info(InfoKind::BlockStart(Marker::While), while_loc))
     }
 }

@@ -32,3 +32,8 @@ end
 100 if
     19 print
 end
+
+5 while dup do
+    dup print
+    1 -
+end

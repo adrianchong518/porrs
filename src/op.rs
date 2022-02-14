@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::program::FileLocation;
 
 #[derive(Debug)]
@@ -27,7 +29,8 @@ pub struct Op {
 pub(crate) enum OpType {
     PushInt(u64),
     Intrinsic(Intrinsic),
-    If(IfOp),
+    If(If),
+    While(While),
 }
 
 #[derive(Debug)]
@@ -38,7 +41,6 @@ pub(crate) enum Intrinsic {
     Print,
     Over,
     Rot,
-
     Plus,
     Subtract,
     Multiply,
@@ -46,20 +48,52 @@ pub(crate) enum Intrinsic {
 }
 
 impl Intrinsic {
+    const DUP_TEXT: &'static str = "dup";
+    const SWAP_TEXT: &'static str = "swap";
+    const DROP_TEXT: &'static str = "drop";
+    const PRINT_TEXT: &'static str = "print";
+    const OVER_TEXT: &'static str = "over";
+    const ROT_TEXT: &'static str = "rot";
+    const PLUS_TEXT: &'static str = "+";
+    const SUBTRACT_TEXT: &'static str = "-";
+    const MULTIPLY_TEXT: &'static str = "*";
+    const DIV_MOD_TEXT: &'static str = "divmod";
+
     pub(crate) fn from_str(text: &str) -> Option<Self> {
         match text {
-            "dup" => Some(Self::Dup),
-            "swap" => Some(Self::Swap),
-            "drop" => Some(Self::Drop),
-            "print" => Some(Self::Print),
-            "over" => Some(Self::Over),
-            "rot" => Some(Self::Rot),
-            "+" => Some(Self::Plus),
-            "-" => Some(Self::Subtract),
-            "*" => Some(Self::Multiply),
-            "divmod" => Some(Self::DivMod),
+            Self::DUP_TEXT => Some(Self::Dup),
+            Self::SWAP_TEXT => Some(Self::Swap),
+            Self::DROP_TEXT => Some(Self::Drop),
+            Self::PRINT_TEXT => Some(Self::Print),
+            Self::OVER_TEXT => Some(Self::Over),
+            Self::ROT_TEXT => Some(Self::Rot),
+            Self::PLUS_TEXT => Some(Self::Plus),
+            Self::SUBTRACT_TEXT => Some(Self::Subtract),
+            Self::MULTIPLY_TEXT => Some(Self::Multiply),
+            Self::DIV_MOD_TEXT => Some(Self::DivMod),
             _ => None,
         }
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            Self::Dup => Self::DUP_TEXT,
+            Self::Swap => Self::SWAP_TEXT,
+            Self::Drop => Self::DROP_TEXT,
+            Self::Print => Self::PRINT_TEXT,
+            Self::Over => Self::OVER_TEXT,
+            Self::Rot => Self::ROT_TEXT,
+            Self::Plus => Self::PLUS_TEXT,
+            Self::Subtract => Self::SUBTRACT_TEXT,
+            Self::Multiply => Self::MULTIPLY_TEXT,
+            Self::DivMod => Self::DIV_MOD_TEXT,
+        }
+    }
+}
+
+impl fmt::Display for Intrinsic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -71,18 +105,35 @@ pub(crate) struct IfStarBlock {
 }
 
 #[derive(Debug)]
-pub(crate) struct IfOp {
+pub(crate) struct If {
     pub(crate) if_block: OpBlock,
     pub(crate) if_star_blocks: Vec<IfStarBlock>,
     pub(crate) else_block: Option<OpBlock>,
 }
 
-impl IfOp {
+impl If {
     pub(crate) fn new() -> Self {
         Self {
             if_block: OpBlock::new(),
             if_star_blocks: Vec::new(),
             else_block: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct While {
+    pub(crate) cond_block: OpBlock,
+    pub(crate) do_loc: Option<FileLocation>,
+    pub(crate) do_block: OpBlock,
+}
+
+impl While {
+    pub(crate) fn new() -> Self {
+        Self {
+            cond_block: OpBlock::new(),
+            do_loc: None,
+            do_block: OpBlock::new(),
         }
     }
 }
