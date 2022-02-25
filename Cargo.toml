@@ -1,11 +1,3 @@
-[package]
-name = "porrs"
-version = "0.1.0"
-edition = "2021"
-
 [workspace]
-members = [".", "porrs-cli"]
-default-members = [".", "porrs-cli"]
-
-[dependencies]
-log = "0.4.14"
+members = ["porrs", "porrs-cli"]
+default-members = ["porrs", "porrs-cli"]

@@ -15,9 +15,11 @@ pub(crate) enum TokenType {
     Marker(Marker),
 }
 
-impl<'token> TokenType {
-    pub(crate) fn from_str(text: &str) -> Self {
-        if let Some(marker) = Marker::from_str(text) {
+impl<T: AsRef<str>> From<T> for TokenType {
+    fn from(text: T) -> Self {
+        let text = text.as_ref();
+
+        if let Ok(marker) = Marker::try_from(text) {
             Self::Marker(marker)
         } else if let Ok(val) = text.parse::<u64>() {
             Self::Int(val)
@@ -54,18 +56,6 @@ impl Marker {
     const DO_TEXT: &'static str = "do";
     const END_TEXT: &'static str = "end";
 
-    fn from_str(text: &str) -> Option<Self> {
-        match text {
-            Self::IF_TEXT => Some(Self::If),
-            Self::IF_STAR_TEXT => Some(Self::IfStar),
-            Self::ELSE_TEXT => Some(Self::Else),
-            Self::WHILE_TEXT => Some(Self::While),
-            Self::DO_TEXT => Some(Self::Do),
-            Self::END_TEXT => Some(Self::End),
-            _ => None,
-        }
-    }
-
     const fn as_str(&self) -> &'static str {
         match self {
             Self::If => Self::IF_TEXT,
@@ -75,6 +65,24 @@ impl Marker {
             Self::Do => Self::DO_TEXT,
             Self::End => Self::END_TEXT,
         }
+    }
+}
+
+pub(crate) struct InvalidMarkerError;
+
+impl TryFrom<&str> for Marker {
+    type Error = InvalidMarkerError;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Ok(match text {
+            Self::IF_TEXT => Self::If,
+            Self::IF_STAR_TEXT => Self::IfStar,
+            Self::ELSE_TEXT => Self::Else,
+            Self::WHILE_TEXT => Self::While,
+            Self::DO_TEXT => Self::Do,
+            Self::END_TEXT => Self::End,
+            _ => return Err(InvalidMarkerError),
+        })
     }
 }
 

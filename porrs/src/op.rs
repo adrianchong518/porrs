@@ -59,22 +59,6 @@ impl Intrinsic {
     const MULTIPLY_TEXT: &'static str = "*";
     const DIV_MOD_TEXT: &'static str = "divmod";
 
-    pub(crate) fn from_str(text: &str) -> Option<Self> {
-        match text {
-            Self::DUP_TEXT => Some(Self::Dup),
-            Self::SWAP_TEXT => Some(Self::Swap),
-            Self::DROP_TEXT => Some(Self::Drop),
-            Self::PRINT_TEXT => Some(Self::Print),
-            Self::OVER_TEXT => Some(Self::Over),
-            Self::ROT_TEXT => Some(Self::Rot),
-            Self::PLUS_TEXT => Some(Self::Plus),
-            Self::SUBTRACT_TEXT => Some(Self::Subtract),
-            Self::MULTIPLY_TEXT => Some(Self::Multiply),
-            Self::DIV_MOD_TEXT => Some(Self::DivMod),
-            _ => None,
-        }
-    }
-
     pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Dup => Self::DUP_TEXT,
@@ -88,6 +72,28 @@ impl Intrinsic {
             Self::Multiply => Self::MULTIPLY_TEXT,
             Self::DivMod => Self::DIV_MOD_TEXT,
         }
+    }
+}
+
+pub(crate) struct InvalidIntrinsicError;
+
+impl TryFrom<&str> for Intrinsic {
+    type Error = InvalidIntrinsicError;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Ok(match text {
+            Self::DUP_TEXT => Self::Dup,
+            Self::SWAP_TEXT => Self::Swap,
+            Self::DROP_TEXT => Self::Drop,
+            Self::PRINT_TEXT => Self::Print,
+            Self::OVER_TEXT => Self::Over,
+            Self::ROT_TEXT => Self::Rot,
+            Self::PLUS_TEXT => Self::Plus,
+            Self::SUBTRACT_TEXT => Self::Subtract,
+            Self::MULTIPLY_TEXT => Self::Multiply,
+            Self::DIV_MOD_TEXT => Self::DivMod,
+            _ => return Err(InvalidIntrinsicError),
+        })
     }
 }
 

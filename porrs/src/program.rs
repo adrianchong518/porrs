@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::lex::Lexer;
 use crate::op::OpBlock;
 use crate::parse::Parser;
-use crate::Error;
+use crate::Result;
 
 #[derive(Clone, Debug)]
 pub(crate) struct FilePosition {
@@ -19,9 +19,9 @@ pub(crate) struct FileLocation {
 }
 
 impl FileLocation {
-    pub(crate) fn from_path(path: &Path) -> Self {
+    pub(crate) fn from_path(path: impl AsRef<Path>) -> Self {
         Self {
-            path: path.to_path_buf(),
+            path: path.as_ref().to_path_buf(),
             pos: None,
         }
     }
@@ -44,12 +44,12 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_path(path: &Path) -> Result<Self, Error> {
-        let lexer = Lexer::from_path(path);
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        let lexer = Lexer::from_path(&path)?;
         let parser = Parser::from_lexer(lexer);
         let root_block = parser.into_root_block()?;
 
-        log::info!("Parsed program at file: {}", path.display());
+        log::info!("Parsed program at file: {}", path.as_ref().display());
         log::trace!("Root Block: {:#?}", root_block);
 
         Ok(Program { root_block })

@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::op::{If, IfStarBlock, Intrinsic, OpBlock, OpType, While};
 use crate::program::{FileLocation, Program};
-use crate::Error;
+use crate::{Error, Result};
 
 #[derive(Debug)]
 pub(crate) enum SimulationError {
@@ -29,7 +29,7 @@ impl Stack {
         self.0.push(val);
     }
 
-    fn pop(&mut self) -> Result<u64, Error> {
+    fn pop(&mut self) -> Result<u64> {
         match self.0.pop() {
             Some(val) => Ok(val),
             None => Err(Error::from(SimulationError::StackUnderflow)),
@@ -37,15 +37,15 @@ impl Stack {
     }
 }
 
-pub fn simulate(program: &Program) -> Result<(), Error> {
+pub fn simulate(program: &Program) -> Result<()> {
     let mut stack = Stack::new();
 
     simulate_op_block(&mut stack, &program.root_block)
 }
 
-fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error> {
+fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<()> {
     for op in op_block.iter() {
-        let result: Result<(), Error> = match &op.typ {
+        let result: Result<()> = match &op.typ {
             OpType::PushInt(val) => Ok(stack.push(*val)),
             OpType::Intrinsic(intr) => simulate_intrinsic(stack, &intr, &op.loc),
             OpType::If(if_op) => simulate_if(stack, if_op, &op.loc),
@@ -64,11 +64,7 @@ fn simulate_op_block(stack: &mut Stack, op_block: &OpBlock) -> Result<(), Error>
     Ok(())
 }
 
-fn simulate_intrinsic(
-    stack: &mut Stack,
-    intrinsic: &Intrinsic,
-    loc: &FileLocation,
-) -> Result<(), Error> {
+fn simulate_intrinsic(stack: &mut Stack, intrinsic: &Intrinsic, loc: &FileLocation) -> Result<()> {
     match intrinsic {
         Intrinsic::Dup => {
             let a = stack.pop()?;
@@ -146,7 +142,7 @@ fn simulate_intrinsic(
 }
 
 fn is_condition_true(cond: u64, loc: &FileLocation) -> bool {
-    if cond > 1 {
+    if cond != 0 && cond != 1 {
         log::warn!(
             "<-- {} --> Non-binary value ({}) used as a boolean condition",
             loc,
@@ -157,7 +153,7 @@ fn is_condition_true(cond: u64, loc: &FileLocation) -> bool {
     cond > 0
 }
 
-fn simulate_if(stack: &mut Stack, if_op: &If, if_loc: &FileLocation) -> Result<(), Error> {
+fn simulate_if(stack: &mut Stack, if_op: &If, if_loc: &FileLocation) -> Result<()> {
     if is_condition_true(stack.pop()?, if_loc) {
         simulate_op_block(stack, &if_op.if_block)
     } else {
@@ -177,7 +173,7 @@ fn simulate_if(stack: &mut Stack, if_op: &If, if_loc: &FileLocation) -> Result<(
     }
 }
 
-fn simulate_while(stack: &mut Stack, while_op: &While) -> Result<(), Error> {
+fn simulate_while(stack: &mut Stack, while_op: &While) -> Result<()> {
     let do_loc = while_op.do_loc.as_ref().unwrap();
 
     simulate_op_block(stack, &while_op.cond_block)?;

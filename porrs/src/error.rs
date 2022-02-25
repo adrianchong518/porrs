@@ -24,7 +24,33 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-// TODO Add an info stack
+#[derive(Debug)]
+pub(crate) enum InfoKind {
+    BlockStart(Marker),
+}
+
+impl fmt::Display for InfoKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BlockStart(marker) => write!(f, "`{}` block starts here", marker),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Info {
+    kind: InfoKind,
+    loc: FileLocation,
+}
+
+impl fmt::Display for Info {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<-- {} --> {}", self.loc, self.kind)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -82,42 +108,12 @@ impl From<ParsingError> for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "<-- {} --> {}",
-            if let Some(loc) = &self.loc {
-                loc.to_string()
-            } else {
-                "Unknown Location".to_string()
-            },
-            self.kind
-        )
+        if let Some(loc) = &self.loc {
+            write!(f, "<-- {} --> ", loc)?;
+        }
+
+        write!(f, "{}", self.kind)
     }
 }
 
 impl error::Error for Error {}
-
-#[derive(Debug)]
-pub(crate) enum InfoKind {
-    BlockStart(Marker),
-}
-
-impl fmt::Display for InfoKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BlockStart(marker) => write!(f, "`{}` block starts here", marker),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Info {
-    kind: InfoKind,
-    loc: FileLocation,
-}
-
-impl fmt::Display for Info {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<-- {} --> {}", self.loc, self.kind)
-    }
-}

@@ -4,14 +4,20 @@ use crate::error::InfoKind;
 use crate::lex::Lexer;
 use crate::op::{If, Intrinsic, Op, OpBlock, OpType, While};
 use crate::program::FileLocation;
-use crate::token::{Marker, TokenType};
-use crate::Error;
+use crate::token::{Marker, Token, TokenType};
+use crate::{Error, Result};
 
 #[derive(Debug)]
 pub(crate) enum ParsingError {
     UnexpectedMarker(Marker, UnexpectedMarker),
     MissingMarker(Marker, MissingMarker),
     UnknownWord(String),
+}
+
+impl ParsingError {
+    fn into_error(self) -> Error {
+        Error::from(self)
+    }
 }
 
 impl fmt::Display for ParsingError {
@@ -38,7 +44,7 @@ pub(crate) enum MissingMarker {
 
 impl MissingMarker {
     fn into_error(self, marker: Marker) -> Error {
-        Error::from(ParsingError::MissingMarker(marker, self))
+        ParsingError::MissingMarker(marker, self).into_error()
     }
 }
 
@@ -70,7 +76,7 @@ pub(crate) enum UnexpectedMarker {
 
 impl UnexpectedMarker {
     fn into_error(self, marker: Marker) -> Error {
-        Error::from(ParsingError::UnexpectedMarker(marker, self))
+        ParsingError::UnexpectedMarker(marker, self).into_error()
     }
 }
 
@@ -111,7 +117,7 @@ impl Parser {
         Self { lexer }
     }
 
-    pub(crate) fn into_root_block(mut self) -> Result<OpBlock, Error> {
+    pub(crate) fn into_root_block(mut self) -> Result<OpBlock> {
         let mut op_block = OpBlock::new();
 
         while let Some(parsed) = self.parse_next_token()? {
@@ -132,13 +138,14 @@ impl Parser {
         Ok(op_block)
     }
 
-    fn parse_next_token(&mut self) -> Result<Option<Parsed>, Error> {
-        let token = if let Some(tok) = self.lexer.next_token()? {
-            tok
-        } else {
-            return Ok(None);
-        };
+    fn parse_next_token(&mut self) -> Result<Option<Parsed>> {
+        self.lexer
+            .consume_token()?
+            .map(|token| self.parse_token(token))
+            .transpose()
+    }
 
+    fn parse_token(&mut self, token: Token) -> Result<Parsed> {
         let parsed = match token.typ {
             TokenType::Word(word) => Parsed::Op(self.parse_word(word.as_str(), token.loc)?),
 
@@ -152,20 +159,22 @@ impl Parser {
 
         log::trace!("Parsed token: {:#?}", parsed);
 
-        Ok(Some(parsed))
+        Ok(parsed)
     }
 
-    fn parse_word(&mut self, text: &str, loc: FileLocation) -> Result<Op, Error> {
-        match Intrinsic::from_str(text) {
-            Some(intr) => Ok(Op {
+    fn parse_word(&mut self, text: &str, loc: FileLocation) -> Result<Op> {
+        match Intrinsic::try_from(text) {
+            Ok(intr) => Ok(Op {
                 typ: OpType::Intrinsic(intr),
                 loc,
             }),
-            None => Err(Error::from(ParsingError::UnknownWord(text.to_owned())).add_loc(loc)),
+            Err(_) => Err(ParsingError::UnknownWord(text.to_owned())
+                .into_error()
+                .add_loc(loc)),
         }
     }
 
-    fn parse_marker(&mut self, marker: Marker, loc: FileLocation) -> Result<Parsed, Error> {
+    fn parse_marker(&mut self, marker: Marker, loc: FileLocation) -> Result<Parsed> {
         match marker {
             Marker::If => self.parse_if(loc).map(|op| Parsed::Op(op)),
             Marker::While => self.parse_while(loc).map(|op| Parsed::Op(op)),
@@ -173,7 +182,7 @@ impl Parser {
         }
     }
 
-    fn parse_if(&mut self, if_loc: FileLocation) -> Result<Op, Error> {
+    fn parse_if(&mut self, if_loc: FileLocation) -> Result<Op> {
         enum ParseState {
             If,
             IfStar,
@@ -253,7 +262,7 @@ impl Parser {
             .push_info(InfoKind::BlockStart(Marker::If), if_loc))
     }
 
-    fn parse_while(&mut self, while_loc: FileLocation) -> Result<Op, Error> {
+    fn parse_while(&mut self, while_loc: FileLocation) -> Result<Op> {
         enum ParseState {
             Cond,
             Do,
